@@ -18,10 +18,12 @@
 
 ## ▶️ Demo Video
 
-👉 Watch Demo
+👉 [Watch Demo](video.mp4)
 
 
 ## 📸 Screenshots
+[image 1](image1.png)
+[image 2](image2.png)
 
 
 ## 🔌 System Architecture
@@ -62,5 +64,7 @@
                                  │── README.md
 
 ## 📫 Author
+
 Navodita Amit Singh
+
 🔗 LinkedIn: https://www.linkedin.com/in/navodita-singh-7350a3299
