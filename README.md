@@ -59,7 +59,9 @@
 
 ## 📂 Project Structure
                                  device-detection-system/
-                                 │── src/            # Embedded code
+                                 │── src/            # server.py
+                                 |── web/            #dashboard.html
+                                 |── arduino/        #mobile_detector.ino
                                  │── images/         # Screenshots
                                  │── README.md
 
