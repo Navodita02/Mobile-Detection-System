@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Detection System — AI Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #080b10;
+  --bg2:      #0d1117;
+  --bg3:      #131921;
+  --bg4:      #1a2232;
+  --border:   rgba(255,255,255,0.06);
+  --border2:  rgba(255,255,255,0.12);
+  --text:     #c9d4e0;
+  --muted:    #4a5568;
+  --cyan:     #00e5ff;
+  --cyan2:    #0099bb;
+  --green:    #00e096;
+  --yellow:   #ffd166;
+  --orange:   #ff8c42;
+  --red:      #ff3a5c;
+  --purple:   #a78bfa;
+  --blue:     #60a5fa;
+  --wifi-c:   #00e096;
+  --bt-c:     #a78bfa;
+  --rf-c:     #ffd166;
+  --mono:     'Space Mono', monospace;
+  --sans:     'DM Sans', sans-serif;
+  --radius:   6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scanline overlay */
+body::after {
+  content:'';
+  position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.05) 3px,rgba(0,0,0,0.05) 4px);
+  pointer-events:none;z-index:9999;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 24px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(10px);
+}
+
+.logo { display:flex; align-items:center; gap:14px; }
+
+.radar-icon {
+  width:36px;height:36px;position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.radar-icon::before,.radar-icon::after {
+  content:'';position:absolute;border-radius:50%;
+  border:1px solid var(--cyan);
+  animation:radar 2.5s ease-out infinite;
+}
+.radar-icon::before { width:36px;height:36px;animation-delay:0s; }
+.radar-icon::after  { width:56px;height:56px;animation-delay:0.9s; }
+.radar-dot {
+  width:10px;height:10px;border-radius:50%;
+  background:var(--cyan);box-shadow:0 0 10px var(--cyan);
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes radar {
+  0% { opacity:0.7;transform:scale(0.3); }
+  100% { opacity:0;transform:scale(1); }
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+.logo-text h1 {
+  font-family:var(--mono);font-size:14px;font-weight:700;
+  color:var(--cyan);letter-spacing:0.06em;text-transform:uppercase;
+}
+.logo-text small {
+  font-size:10px;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;
+}
+
+.header-right { display:flex;align-items:center;gap:16px; }
+
+.conn-pill {
+  display:flex;align-items:center;gap:7px;
+  padding:5px 12px;border-radius:20px;
+  border:1px solid var(--border2);
+  font-family:var(--mono);font-size:10px;letter-spacing:0.08em;
+  color:var(--muted);text-transform:uppercase;
+  transition:all 0.3s;
+}
+.conn-pill.online { border-color:var(--green);color:var(--green); }
+.conn-dot {
+  width:6px;height:6px;border-radius:50%;
+  background:var(--muted);transition:all 0.3s;
+}
+.conn-dot.online {
+  background:var(--green);box-shadow:0 0 6px var(--green);
+  animation:blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+.server-input {
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:var(--radius);color:var(--text);
+  font-family:var(--mono);font-size:11px;
+  padding:5px 10px;width:220px;outline:none;
+}
+.server-input:focus { border-color:var(--cyan); }
+
+.btn {
+  font-family:var(--mono);font-size:10px;letter-spacing:0.1em;
+  text-transform:uppercase;padding:6px 14px;
+  border:1px solid var(--border2);border-radius:var(--radius);
+  background:transparent;color:var(--muted);cursor:pointer;transition:all 0.2s;
+}
+.btn:hover { border-color:var(--cyan);color:var(--cyan); }
+.btn.danger:hover { border-color:var(--red);color:var(--red); }
+
+/* ── Alert Banner ──────────────────────────────────────────── */
+.alert-strip {
+  padding:0 24px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  overflow:hidden;height:0;transition:height 0.3s;
+}
+.alert-strip.active { height:44px; }
+.alert-strip-inner {
+  height:44px;display:flex;align-items:center;gap:12px;
+}
+.alert-label {
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  color:var(--red);letter-spacing:0.1em;text-transform:uppercase;
+  animation:flash-text 0.5s ease-in-out infinite alternate;
+}
+@keyframes flash-text { from{opacity:1} to{opacity:0.4} }
+.alert-msg { font-size:12px;color:var(--orange); }
+
+/* ── Layout ────────────────────────────────────────────────── */
+.app-body {
+  display:grid;
+  grid-template-columns:300px 1fr;
+  grid-template-rows:auto 1fr;
+  height:calc(100vh - 65px);
+  min-height:0;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.sidebar {
+  grid-row:1/3;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+  background:var(--bg2);
+}
+
+.panel {
+  border-bottom:1px solid var(--border);
+  padding:18px 20px;
+}
+.panel-title {
+  font-family:var(--mono);font-size:9px;letter-spacing:0.25em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;
+}
+.panel-title::after {
+  content:'';flex:1;height:1px;background:var(--border);
+}
+
+/* Stat cards */
+.stat-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+.stat-card {
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--radius);padding:12px 10px;
+  transition:border-color 0.3s;
+}
+.stat-card.flash { border-color:var(--cyan) !important; }
+.stat-val {
+  font-family:var(--mono);font-size:24px;font-weight:700;
+  color:var(--cyan);line-height:1;margin-bottom:4px;
+}
+.stat-lbl {
+  font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);
+}
+.stat-card.wifi   .stat-val { color:var(--wifi-c); }
+.stat-card.bt     .stat-val { color:var(--bt-c); }
+.stat-card.rf     .stat-val { color:var(--rf-c); }
+.stat-card.alert  .stat-val { color:var(--red); }
+.stat-card.phone  .stat-val { color:var(--orange); }
+.stat-card.anomaly .stat-val { color:var(--purple); }
+
+/* AI Classification breakdown */
+.class-bars { display:flex;flex-direction:column;gap:8px; }
+.class-row { display:flex;align-items:center;gap:8px; }
+.class-label {
+  font-family:var(--mono);font-size:10px;color:var(--text);width:90px;flex-shrink:0;
+}
+.bar-track { flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden; }
+.bar-fill { height:100%;border-radius:3px;transition:width 0.5s ease; }
+.bar-fill.phone     { background:var(--orange); }
+.bar-fill.device    { background:var(--blue); }
+.bar-fill.infra     { background:var(--muted); }
+.bar-fill.accessory { background:var(--purple); }
+.bar-fill.noise     { background:var(--border2); }
+.class-count { font-family:var(--mono);font-size:10px;color:var(--muted);width:24px;text-align:right; }
+
+/* Distance zones */
+.zone-list { display:flex;flex-direction:column;gap:6px; }
+.zone-row { display:flex;align-items:center;gap:10px; }
+.zone-dot {
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+}
+.zone-dot.critical { background:var(--red);box-shadow:0 0 6px var(--red); }
+.zone-dot.close    { background:var(--orange); }
+.zone-dot.nearby   { background:var(--yellow); }
+.zone-dot.far      { background:var(--muted); }
+.zone-label { font-size:11px;color:var(--muted); }
+
+/* Trend indicator */
+.trend-widget { display:flex;align-items:center;gap:12px;padding:8px 0; }
+.trend-num {
+  font-family:var(--mono);font-size:32px;font-weight:700;color:var(--cyan);
+}
+.trend-meta { display:flex;flex-direction:column;gap:3px; }
+.trend-arrow { font-size:18px; }
+.trend-lbl { font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase; }
+
+/* Mini chart */
+.mini-chart { width:100%;height:60px;position:relative;overflow:hidden; }
+.mini-chart canvas { width:100%!important; }
+
+/* Anomaly indicator */
+.anomaly-indicator {
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:var(--radius);
+  background:var(--bg4);border:1px solid var(--border);
+  transition:border-color 0.3s;
+}
+.anomaly-indicator.active { border-color:var(--purple);background:rgba(167,139,250,0.06); }
+.anomaly-pulse {
+  width:10px;height:10px;border-radius:50%;background:var(--muted);
+  transition:all 0.3s;
+}
+.anomaly-pulse.active {
+  background:var(--purple);box-shadow:0 0 8px var(--purple);
+  animation:pulse 1s ease-in-out infinite;
+}
+.anomaly-text { font-size:11px; }
+.anomaly-title { color:var(--text);font-weight:500; }
+.anomaly-sub { color:var(--muted);font-size:10px;margin-top:2px; }
+
+/* Uptime */
+#uptime { font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;padding:10px; }
+
+/* ── AI Feed (right panel top) ─────────────────────────────── */
+.ai-topbar {
+  padding:12px 24px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.ai-stats-row { display:flex;gap:20px; }
+.ai-stat-item { display:flex;align-items:center;gap:6px; }
+.ai-stat-dot { width:6px;height:6px;border-radius:50%; }
+.ai-stat-text { font-family:var(--mono);font-size:11px;color:var(--muted); }
+.ai-stat-num  { font-family:var(--mono);font-size:11px;color:var(--text);font-weight:700; }
+.last-seen-text { font-family:var(--mono);font-size:10px;color:var(--muted); }
+
+/* ── Detection Feed ─────────────────────────────────────────── */
+.feed-container { flex:1;overflow:hidden;display:flex;flex-direction:column; }
+
+.feed-header {
+  display:grid;
+  grid-template-columns:75px 70px 60px 130px 120px 90px 100px;
+  gap:4px;padding:8px 24px;
+  font-family:var(--mono);font-size:9px;letter-spacing:0.15em;
+  text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+
+.feed-body { overflow-y:auto;flex:1; }
+
+.feed-item {
+  display:grid;
+  grid-template-columns:75px 70px 60px 130px 120px 90px 100px;
+  gap:4px;padding:9px 24px;
+  border-bottom:1px solid var(--border);
+  transition:background 0.2s;
+  animation:slide-in 0.3s ease;
+}
+.feed-item:hover { background:var(--bg3); }
+.feed-item.is-alert { border-left:2px solid var(--red); }
+.feed-item.is-anomaly { border-left:2px solid var(--purple); }
+
+@keyframes slide-in { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+
+.type-badge {
+  display:inline-flex;align-items:center;
+  padding:2px 7px;border-radius:3px;
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  letter-spacing:0.08em;text-transform:uppercase;
+}
+.type-badge.wifi       { background:rgba(0,224,150,0.12);color:var(--wifi-c); }
+.type-badge.bluetooth  { background:rgba(167,139,250,0.12);color:var(--bt-c); }
+.type-badge.rf         { background:rgba(255,209,102,0.12);color:var(--rf-c); }
+
+.feed-rssi { font-family:var(--mono);font-size:11px;font-weight:700; }
+.feed-name { font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.feed-device { font-family:var(--mono);font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.feed-time { font-family:var(--mono);font-size:10px;color:var(--muted); }
+
+.class-badge {
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 6px;border-radius:3px;
+  font-family:var(--mono);font-size:9px;
+}
+.class-badge.PHONE        { background:rgba(255,140,66,0.15);color:var(--orange); }
+.class-badge.DEVICE       { background:rgba(96,165,250,0.15);color:var(--blue); }
+.class-badge.INFRASTRUCTURE { background:rgba(74,85,104,0.15);color:var(--muted); }
+.class-badge.ACCESSORY    { background:rgba(167,139,250,0.15);color:var(--purple); }
+.class-badge.NOISE        { background:rgba(74,85,104,0.1);color:var(--muted); }
+.class-badge.UNKNOWN      { background:rgba(74,85,104,0.1);color:var(--muted); }
+
+.dist-badge {
+  font-family:var(--mono);font-size:10px;
+}
+
+.alert-tag {
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  color:var(--red);letter-spacing:0.06em;
+}
+.anom-tag {
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  color:var(--purple);letter-spacing:0.06em;
+}
+.ok-tag { font-family:var(--mono);font-size:9px;color:var(--muted); }
+
+/* Empty state */
+.empty-state {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:200px;color:var(--muted);gap:8px;
+  font-family:var(--mono);font-size:12px;
+}
+.empty-icon { font-size:40px;opacity:0.3; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border2);border-radius:2px; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="radar-icon"><div class="radar-dot"></div></div>
+    <div class="logo-text">
+      <h1>MobileDetect AI</h1>
+      <small>ESP32 + LM358 · AI-Powered Dashboard</small>
+    </div>
+  </div>
+  <div class="header-right">
+    <input class="server-input" id="server-url" value="http://localhost:5000" placeholder="http://SERVER_IP:5000">
+    <div class="conn-pill" id="conn-pill">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="conn-label">Connecting…</span>
+    </div>
+    <button class="btn" onclick="reconnect()">Reconnect</button>
+    <button class="btn danger" onclick="clearData()">Clear Log</button>
+  </div>
+</header>
+
+<!-- ── Alert Strip ─────────────────────────────────────────────────── -->
+<div class="alert-strip" id="alert-strip">
+  <div class="alert-strip-inner">
+    <span class="alert-label">⚠ ALERT</span>
+    <span class="alert-msg" id="alert-msg">—</span>
+  </div>
+</div>
+
+<!-- ── App Body ────────────────────────────────────────────────────── -->
+<div class="app-body">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Stats -->
+    <div class="panel">
+      <div class="panel-title">Detection Stats</div>
+      <div class="stat-grid">
+        <div class="stat-card" id="sc-total">
+          <div class="stat-val" id="s-total">0</div>
+          <div class="stat-lbl">Total</div>
+        </div>
+        <div class="stat-card alert" id="sc-alert">
+          <div class="stat-val" id="s-alerts">0</div>
+          <div class="stat-lbl">Alerts</div>
+        </div>
+        <div class="stat-card wifi">
+          <div class="stat-val" id="s-wifi">0</div>
+          <div class="stat-lbl">WiFi</div>
+        </div>
+        <div class="stat-card bt">
+          <div class="stat-val" id="s-bt">0</div>
+          <div class="stat-lbl">Bluetooth</div>
+        </div>
+        <div class="stat-card rf">
+          <div class="stat-val" id="s-rf">0</div>
+          <div class="stat-lbl">RF (LM358)</div>
+        </div>
+        <div class="stat-card phone">
+          <div class="stat-val" id="s-phones">0</div>
+          <div class="stat-lbl">Phones</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Classification -->
+    <div class="panel">
+      <div class="panel-title">AI Classification</div>
+      <div class="class-bars">
+        <div class="class-row">
+          <div class="class-label">📱 Phone</div>
+          <div class="bar-track"><div class="bar-fill phone" id="bar-phone" style="width:0%"></div></div>
+          <div class="class-count" id="cnt-phone">0</div>
+        </div>
+        <div class="class-row">
+          <div class="class-label">📡 Device</div>
+          <div class="bar-track"><div class="bar-fill device" id="bar-device" style="width:0%"></div></div>
+          <div class="class-count" id="cnt-device">0</div>
+        </div>
+        <div class="class-row">
+          <div class="class-label">🎧 Accessory</div>
+          <div class="bar-track"><div class="bar-fill accessory" id="bar-accessory" style="width:0%"></div></div>
+          <div class="class-count" id="cnt-accessory">0</div>
+        </div>
+        <div class="class-row">
+          <div class="class-label">🏗 Infra</div>
+          <div class="bar-track"><div class="bar-fill infra" id="bar-infra" style="width:0%"></div></div>
+          <div class="class-count" id="cnt-infra">0</div>
+        </div>
+        <div class="class-row">
+          <div class="class-label">〰 Noise</div>
+          <div class="bar-track"><div class="bar-fill noise" id="bar-noise" style="width:0%"></div></div>
+          <div class="class-count" id="cnt-noise">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anomaly Detector -->
+    <div class="panel">
+      <div class="panel-title">Anomaly Detector</div>
+      <div class="anomaly-indicator" id="anom-indicator">
+        <div class="anomaly-pulse" id="anom-pulse"></div>
+        <div class="anomaly-text">
+          <div class="anomaly-title" id="anom-title">Monitoring…</div>
+          <div class="anomaly-sub" id="anom-sub">No anomalies detected</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <div>Z-score: <span id="anom-z" style="color:var(--purple)">—</span></div>
+        <div>Count: <span id="anom-count" style="color:var(--purple)" >0</span></div>
+      </div>
+    </div>
+
+    <!-- Distance Estimator -->
+    <div class="panel">
+      <div class="panel-title">Distance Estimation</div>
+      <div class="zone-list">
+        <div class="zone-row">
+          <div class="zone-dot critical"></div>
+          <div class="zone-label">Critical &lt;1m — <span id="z-critical" style="color:var(--red);font-family:var(--mono)">0</span></div>
+        </div>
+        <div class="zone-row">
+          <div class="zone-dot close"></div>
+          <div class="zone-label">Close 1–3m — <span id="z-close" style="color:var(--orange);font-family:var(--mono)">0</span></div>
+        </div>
+        <div class="zone-row">
+          <div class="zone-dot nearby"></div>
+          <div class="zone-label">Nearby 3–8m — <span id="z-nearby" style="color:var(--yellow);font-family:var(--mono)">0</span></div>
+        </div>
+        <div class="zone-row">
+          <div class="zone-dot far"></div>
+          <div class="zone-label">Far &gt;8m — <span id="z-far" style="color:var(--muted);font-family:var(--mono)">0</span></div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--muted);">
+        Closest: <span id="closest-dist" style="color:var(--cyan)">—</span>
+      </div>
+    </div>
+
+    <!-- Trend Analyzer -->
+    <div class="panel">
+      <div class="panel-title">Trend Analyzer</div>
+      <div class="trend-widget">
+        <div class="trend-num" id="trend-rate">0</div>
+        <div class="trend-meta">
+          <div class="trend-arrow" id="trend-arrow">—</div>
+          <div class="trend-lbl">detections/min</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px;">
+            5min avg: <span id="trend-avg" style="color:var(--text);font-family:var(--mono)">0</span>
+          </div>
+        </div>
+      </div>
+      <div class="mini-chart"><canvas id="trend-canvas" height="60"></canvas></div>
+    </div>
+
+    <!-- Uptime -->
+    <div id="uptime">—</div>
+
+  </div><!-- /sidebar -->
+
+  <!-- RIGHT COLUMN -->
+  <div style="display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+
+    <!-- AI top bar -->
+    <div class="ai-topbar">
+      <div class="ai-stats-row">
+        <div class="ai-stat-item">
+          <div class="ai-stat-dot" style="background:var(--orange)"></div>
+          <div class="ai-stat-text">Phones:&nbsp;</div>
+          <div class="ai-stat-num" id="top-phones">0</div>
+        </div>
+        <div class="ai-stat-item">
+          <div class="ai-stat-dot" style="background:var(--purple)"></div>
+          <div class="ai-stat-text">Anomalies:&nbsp;</div>
+          <div class="ai-stat-num" id="top-anom">0</div>
+        </div>
+        <div class="ai-stat-item">
+          <div class="ai-stat-dot" style="background:var(--red)"></div>
+          <div class="ai-stat-text">Alerts:&nbsp;</div>
+          <div class="ai-stat-num" id="top-alerts">0</div>
+        </div>
+        <div class="ai-stat-item">
+          <div class="ai-stat-dot" style="background:var(--cyan)"></div>
+          <div class="ai-stat-text">Total:&nbsp;</div>
+          <div class="ai-stat-num" id="top-total">0</div>
+        </div>
+      </div>
+      <div class="last-seen-text" id="last-seen">Waiting for data…</div>
+    </div>
+
+    <!-- Feed header -->
+    <div class="feed-header">
+      <span>Type</span>
+      <span>RSSI</span>
+      <span>Dist</span>
+      <span>Name / SSID</span>
+      <span>Device ID</span>
+      <span>Time</span>
+      <span>AI Label</span>
+    </div>
+
+    <!-- Detection feed -->
+    <div class="feed-body" id="feed-body">
+      <div class="empty-state">
+        <div class="empty-icon">◎</div>
+        <div>Waiting for detections…</div>
+        <div style="font-size:10px;margin-top:4px;">Make sure server.py is running</div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /app-body -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+let evtSource   = null;
+let alertTimer  = null;
+let stats       = { total:0, wifi:0, bluetooth:0, rf:0, alerts:0, phones:0, anomalies:0 };
+let classCounts = { PHONE:0, DEVICE:0, ACCESSORY:0, INFRASTRUCTURE:0, NOISE:0, UNKNOWN:0 };
+let zoneCounts  = { CRITICAL:0, CLOSE:0, NEARBY:0, FAR:0 };
+let trendData   = [];
+let closestDist = null;
+let sessionStart = Date.now();
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const txt = (id, v) => { const el=$(id); if(el) el.textContent=v; };
+
+function rssiColor(rssi) {
+  if (rssi > -45) return 'var(--red)';
+  if (rssi > -65) return 'var(--orange)';
+  if (rssi > -80) return 'var(--yellow)';
+  return 'var(--muted)';
+}
+
+function baseUrl() { return $('server-url').value.replace(/\/$/, ''); }
+
+// ── Connect SSE ────────────────────────────────────────────────────────────
+function connect() {
+  if (evtSource) evtSource.close();
+  const url = baseUrl() + '/stream';
+  evtSource = new EventSource(url);
+  evtSource.onopen  = () => setConnected(true);
+  evtSource.onerror = () => setConnected(false);
+  evtSource.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.event === 'init') {
+        applyStats(msg.stats);
+        if (msg.recent && msg.recent.length) {
+          $('feed-body').innerHTML = '';
+          [...msg.recent].reverse().forEach(addFeedItem);
+        }
+        if (msg.trend_history) trendData = msg.trend_history;
+        drawTrend();
+      } else if (msg.event === 'detection') {
+        applyStats(msg.stats);
+        addFeedItem(msg.data);
+        updateAI(msg.data);
+        if (msg.trend_history) { trendData = msg.trend_history; drawTrend(); }
+        if (msg.data.alert) showAlert(msg.data);
+      } else if (msg.event === 'cleared') {
+        $('feed-body').innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div><div>Log cleared</div></div>`;
+        classCounts = { PHONE:0, DEVICE:0, ACCESSORY:0, INFRASTRUCTURE:0, NOISE:0, UNKNOWN:0 };
+        zoneCounts  = { CRITICAL:0, CLOSE:0, NEARBY:0, FAR:0 };
+        trendData   = [];
+        closestDist = null;
+        applyStats({ total:0, wifi:0, bluetooth:0, rf:0, alerts:0, phones:0, anomalies:0 });
+        drawTrend();
+        updateDistUI();
+        updateClassUI();
+      }
+    } catch(e) { /* ping */ }
+  };
+}
+
+function reconnect() { sessionStart = Date.now(); connect(); }
+
+function setConnected(ok) {
+  $('conn-dot').className = 'conn-dot' + (ok ? ' online' : '');
+  $('conn-label').textContent = ok ? 'Connected' : 'Offline';
+  $('conn-pill').className = 'conn-pill' + (ok ? ' online' : '');
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function applyStats(s) {
+  stats = { ...stats, ...s };
+  txt('s-total',  s.total  ?? 0);
+  txt('s-alerts', s.alerts ?? 0);
+  txt('s-wifi',   s.wifi   ?? 0);
+  txt('s-bt',     s.bluetooth ?? 0);
+  txt('s-rf',     s.rf     ?? 0);
+  txt('s-phones', s.phones ?? 0);
+  txt('top-phones', s.phones ?? 0);
+  txt('top-anom',   s.anomalies ?? 0);
+  txt('top-alerts', s.alerts ?? 0);
+  txt('top-total',  s.total ?? 0);
+
+  // Flash stat card
+  ['sc-total','sc-alert'].forEach(id => {
+    const el = $(id); if(!el) return;
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 400);
+  });
+}
+
+// ── AI Update ─────────────────────────────────────────────────────────────
+function updateAI(d) {
+  if (!d.ai) return;
+  const { classification, anomaly, distance, trend } = d.ai;
+
+  // Classification counts
+  const lbl = classification.label;
+  if (classCounts[lbl] !== undefined) classCounts[lbl]++;
+  else classCounts['UNKNOWN']++;
+  updateClassUI();
+
+  // Distance zones
+  const zone = distance.zone;
+  if (zoneCounts[zone] !== undefined) zoneCounts[zone]++;
+  updateDistUI();
+
+  // Distance closest
+  if (closestDist === null || distance.distance_m < closestDist) {
+    closestDist = distance.distance_m;
+    txt('closest-dist', closestDist.toFixed(1) + ' m');
+  }
+
+  // Anomaly
+  const aIndic = $('anom-indicator');
+  const aPulse = $('anom-pulse');
+  if (anomaly.anomaly) {
+    aIndic.classList.add('active');
+    aPulse.classList.add('active');
+    txt('anom-title', '⚡ Anomaly Detected!');
+    txt('anom-sub', anomaly.reason || 'Unusual spike');
+    txt('anom-z', anomaly.z_score?.toFixed(2) ?? '—');
+    txt('anom-count', stats.anomalies ?? 0);
+    setTimeout(() => {
+      aIndic.classList.remove('active');
+      aPulse.classList.remove('active');
+      txt('anom-title', 'Monitoring…');
+      txt('anom-sub', 'No anomalies detected');
+    }, 5000);
+  } else {
+    txt('anom-z', anomaly.z_score?.toFixed(2) ?? '—');
+    txt('anom-count', stats.anomalies ?? 0);
+  }
+
+  // Trend
+  if (trend) {
+    txt('trend-rate', trend.per_min_now ?? 0);
+    txt('trend-avg',  trend.per_min_avg5 ?? 0);
+    const arrows = { RISING:'↑', FALLING:'↓', STABLE:'→' };
+    const colors  = { RISING:'var(--red)', FALLING:'var(--green)', STABLE:'var(--muted)' };
+    const el = $('trend-arrow');
+    el.textContent = arrows[trend.trend] || '—';
+    el.style.color = colors[trend.trend] || 'var(--muted)';
+  }
+}
+
+function updateClassUI() {
+  const total = Object.values(classCounts).reduce((a,b)=>a+b,0) || 1;
+  for (const [key, cnt] of Object.entries(classCounts)) {
+    const kl = key.toLowerCase();
+    const bar = $('bar-' + kl);
+    const ct  = $('cnt-' + kl);
+    if (bar) bar.style.width = (cnt/total*100) + '%';
+    if (ct)  ct.textContent = cnt;
+  }
+}
+
+function updateDistUI() {
+  txt('z-critical', zoneCounts.CRITICAL);
+  txt('z-close',    zoneCounts.CLOSE);
+  txt('z-nearby',   zoneCounts.NEARBY);
+  txt('z-far',      zoneCounts.FAR);
+}
+
+// ── Feed Item ──────────────────────────────────────────────────────────────
+function addFeedItem(d) {
+  const feed = $('feed-body');
+  const empty = feed.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const ai   = d.ai || {};
+  const cls  = ai.classification || {};
+  const dist = ai.distance || {};
+  const anom = ai.anomaly  || {};
+
+  const typeClass = d.type === 'Bluetooth' ? 'bluetooth' : d.type.toLowerCase();
+  const time = new Date(d.timestamp).toLocaleTimeString('en-GB', {hour12:false});
+  const color = rssiColor(d.rssi);
+
+  // Distance display
+  const distStr = dist.distance_m != null ? dist.distance_m.toFixed(1)+'m' : '—';
+  const distColor = {CRITICAL:'var(--red)', CLOSE:'var(--orange)', NEARBY:'var(--yellow)', FAR:'var(--muted)'}[dist.zone] || 'var(--muted)';
+
+  // Status flags
+  let statusHtml = '';
+  if (anom.anomaly)  statusHtml += '<span class="anom-tag">⚡ANOM</span> ';
+  if (d.alert)       statusHtml += '<span class="alert-tag">⚠ALERT</span>';
+  if (!statusHtml)   statusHtml = '<span class="ok-tag">OK</span>';
+
+  const el = document.createElement('div');
+  el.className = 'feed-item'
+    + (d.alert        ? ' is-alert'   : '')
+    + (anom.anomaly   ? ' is-anomaly' : '');
+
+  el.innerHTML = `
+    <div><span class="type-badge ${typeClass}">${d.type}</span></div>
+    <div class="feed-rssi" style="color:${color}">${d.rssi} dBm</div>
+    <div class="dist-badge" style="color:${distColor}">${distStr}</div>
+    <div class="feed-name" title="${d.name}">${d.name || '—'}</div>
+    <div class="feed-device" title="${d.device_id}">${d.device_id || '—'}</div>
+    <div class="feed-time">${time}</div>
+    <div>
+      <span class="class-badge ${cls.label || 'UNKNOWN'}" title="${cls.reason || ''}">
+        ${cls.label || '?'} ${cls.confidence != null ? Math.round(cls.confidence*100)+'%' : ''}
+      </span>
+    </div>
+  `;
+
+  feed.insertBefore(el, feed.firstChild);
+  while (feed.children.length > 300) feed.removeChild(feed.lastChild);
+
+  txt('last-seen', 'Last: ' + time);
+}
+
+// ── Trend Mini Chart ───────────────────────────────────────────────────────
+function drawTrend() {
+  const canvas = $('trend-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W   = canvas.offsetWidth || 260;
+  const H   = 60;
+  canvas.width  = W;
+  canvas.height = H;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const data = trendData.slice(-30);
+  if (data.length < 2) return;
+
+  const rates = data.map(d => d.rate || 0);
+  const maxR  = Math.max(...rates, 1);
+
+  // Draw area
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    const x = (i / (data.length - 1)) * W;
+    const y = H - ((d.rate || 0) / maxR) * (H - 8);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = 'rgba(0,229,255,0.8)';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  // Fill
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(0,229,255,0.15)');
+  grad.addColorStop(1, 'rgba(0,229,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+}
+
+// ── Alert ─────────────────────────────────────────────────────────────────
+function showAlert(d) {
+  const strip = $('alert-strip');
+  const ai = d.ai || {};
+  const dist = ai.distance || {};
+  let msg = `${d.type} "${d.name}" detected at ${d.rssi} dBm`;
+  if (dist.distance_m) msg += ` · ~${dist.distance_m.toFixed(1)}m away`;
+  if (ai.classification?.label === 'PHONE') msg += ' · 📱 PHONE IDENTIFIED';
+  txt('alert-msg', msg);
+  strip.classList.add('active');
+  clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => strip.classList.remove('active'), 7000);
+}
+
+// ── Clear ─────────────────────────────────────────────────────────────────
+async function clearData() {
+  try { await fetch(baseUrl() + '/api/clear', { method:'POST' }); }
+  catch(e) { console.warn(e); }
+}
+
+// ── Uptime ticker ─────────────────────────────────────────────────────────
+setInterval(() => {
+  const sec = Math.floor((Date.now() - sessionStart) / 1000);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  txt('uptime', `Uptime: ${h}h ${m}m ${s}s`);
+}, 1000);
+
+// Redraw trend on resize
+window.addEventListener('resize', drawTrend);
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>
